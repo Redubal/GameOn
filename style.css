@@ -324,6 +324,19 @@ input::placeholder{color:var(--muted)}
 #s-lobby .glass.lobby-card { position: relative; overflow: hidden; }
 #lobby-countdown { border-radius: inherit; }
 
+/* ── ADMIN STICKY HEADER ─────────────────────────────────── */
+#s-admin { justify-content: flex-start; }
+#s-admin .ahdr {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(6,6,15,.96);
+  backdrop-filter: blur(12px);
+  border-radius: 8px;
+  padding: 10px 0;
+  margin-bottom: 2px;
+}
+
 /* ── INNSTILLINGER PANEL ─────────────────────────────────── */
 .s-panel { margin-bottom: 12px; }
 .s-hdr { display:flex;justify-content:space-between;align-items:center;padding:11px 16px;cursor:pointer;user-select:none;border-radius:inherit }
