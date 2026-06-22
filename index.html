@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="gameon_logo.svg">
+<link rel="apple-touch-icon" href="gameon_logo.svg">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>GAME ON — CTF Challenge</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="bg"></canvas>
+
+<div class="cov" id="cov"><div class="cbox" id="cbox"><div class="ct" id="ct">✓ KORREKT!</div><div class="cs" id="cs"></div></div></div>
+
+<div class="cov" id="stopped-ov" style="z-index:45">
+  <div class="cbox" style="background:rgba(239,68,68,.12);border-color:var(--red);padding:32px 44px;max-width:380px">
+    <div style="font-size:48px;margin-bottom:12px">⛔</div>
+    <div class="ct" style="color:var(--red);font-size:22px">SPILL AVSLUTTET</div>
+    <div class="cs" style="margin-top:8px;font-size:14px;line-height:1.6">Admin har stoppet spillet.<br>Ta kontakt med arrangøren.</div>
+    <button onclick="resetAndHome()" style="margin-top:20px;padding:11px 28px;background:var(--red);border:none;border-radius:8px;color:#fff;font-family:var(--gfont);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.08em;width:100%">← TIL FORSIDEN</button>
+  </div>
+</div>
+
+<!-- LAG-PODIUM OVERLAY -->
+<div class="cov" id="team-podium-ov" style="z-index:50;background:rgba(2,6,23,.96)">
+  <canvas id="tp-fw-cv" style="position:fixed;inset:0;pointer-events:none;z-index:49"></canvas>
+  <div class="cbox pdm-team-box" style="z-index:51;position:relative;text-align:center;padding:40px 48px;max-width:400px">
+    <div id="pdm-t-emoji" style="font-size:72px;margin-bottom:16px;line-height:1"></div>
+    <div id="pdm-t-label" style="font-family:var(--gfont);font-size:30px;font-weight:900;letter-spacing:.06em;margin-bottom:8px"></div>
+    <div id="pdm-t-team" style="font-size:18px;color:var(--muted);margin-bottom:4px"></div>
+    <div id="pdm-t-score" style="font-family:var(--mono);font-size:24px;font-weight:700;color:var(--cyan);margin-bottom:24px"></div>
+    <button onclick="resetAndHome()" class="btn" style="width:100%">← Tilbake til forsiden</button>
+  </div>
+</div>
+
+<!-- HOME -->
+<div class="screen on" id="s-home">
+  <img src="gameon_logo.svg" alt="Game On CTF Challenge" class="site-logo">
+  <div id="home-version" style="font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.2);letter-spacing:.12em;margin-top:-6px;margin-bottom:6px"></div>
+  <div class="glass card">
+    <h2>🎮 REGISTRER LAG</h2>
+    <div id="hmsg" class="msg"></div>
+    <input type="text" id="tname" maxlength="24" placeholder="Lagnavn..." autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="btn" id="reg-btn">REGISTRER →</button>
+    <div class="admin-lnk">Admin? <a href="#admin" target="_blank">Åpne dashboard ↗</a></div>
+    <button class="btn sec rules-btn" onclick="R('rules')">📋 Spilleregler</button>
+  </div>
+</div>
+
+<!-- LOBBY -->
+<div class="screen" id="s-lobby">
+  <div class="glass lobby-card">
+    <!-- NEDTELLING OVERLAY -->
+    <div id="lobby-countdown" style="display:none;position:absolute;inset:0;background:rgba(2,6,23,.93);border-radius:inherit;z-index:10;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+      <div style="font-size:13px;color:var(--muted);font-family:var(--gfont);letter-spacing:.1em">SPILLET STARTER OM</div>
+      <div id="lcd-num" style="font-family:var(--gfont);font-size:96px;font-weight:900;color:var(--amber);text-shadow:0 0 40px rgba(245,158,11,.6);line-height:1">5</div>
+      <div style="font-size:13px;color:var(--muted)">sekunder — gjør deg klar!</div>
+    </div>
+    <div class="pulse-ring">⏳</div>
+    <div class="lobby-team" id="lobby-team-name">—</div>
+    <div class="lobby-wait">Laget er registrert!<br>Venter på at admin starter spillet...</div>
+    <div id="lobby-local-warn" class="local-warn" style="display:none">
+      ⚠ Local Mode: Admin og lag må bruke <strong>samme nettleser</strong> for automatisk start.<br>
+      Ellers: klikk «Sjekk start» når admin har startet.
+    </div>
+    <div class="lobby-teams-list" id="lobby-teams-list"></div>
+    <button class="btn" id="check-start-btn">🔄 Sjekk start</button>
+    <button class="btn sec" onclick="leaveGame()">← Endre lagnavn</button>
+    <button class="btn sec rules-btn" onclick="R('rules')">📋 Spilleregler</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen" id="s-game">
+  <div class="ghdr">
+    <div class="gteam"><div class="gteam-lbl">LAG</div><div class="gteam-name" id="gteam">—</div></div>
+    <div class="timer-wrap">
+      <svg viewBox="0 0 68 68"><circle class="t-bg" cx="34" cy="34" r="28"/><circle class="t-fg" cx="34" cy="34" r="28" id="t-ring"/></svg>
+      <div id="timer-txt">25:00</div>
+    </div>
+    <div class="pdots" id="pdots"></div>
+  </div>
+  <div class="gbody">
+    <!-- VANSKELIGHETSVELGER -->
+    <div class="glass dpick-wrap" id="dpick-wrap" style="display:none">
+      <div class="dpick-head">
+        <div class="dpick-icon" id="dpick-icon">🎯</div>
+        <div class="dpick-name" id="dpick-name">Tema</div>
+        <div class="dpick-num" id="dpick-num">Oppgave 1 av 10</div>
+        <div class="dpick-sub">Velg vanskelighetsgrad — du kan ikke endre etterpå</div>
+      </div>
+      <div class="dpick-cards" id="dpick-cards"></div>
+    </div>
+    <!-- SPØRSMÅLSKORT -->
+    <div class="glass qcard" id="qcard">
+      <div class="qmeta">
+        <div class="qbadge ctf" id="qbadge">CTF</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+          <div class="qpts" id="qpts"></div>
+          <div class="qnum" id="qnum">01/10</div>
+        </div>
+      </div>
+      <div class="qcat" id="qcat"></div>
+      <div class="qtitle" id="qtitle"></div>
+      <div class="qtext" id="qtext"></div>
+      <div class="hints" id="hints"></div>
+    </div>
+  </div>
+  <div class="aarea">
+    <div class="ainner">
+      <div class="arow">
+        <input type="text" id="ans" placeholder="Svar..." autocomplete="off" autocorrect="off" spellcheck="false">
+        <button id="subbtn">SUBMIT →</button>
+      </div>
+      <div class="fb" id="fb"></div>
+    </div>
+  </div>
+</div>
+
+<!-- WIN -->
+<div class="screen" id="s-win">
+  <canvas id="fw-cv" style="position:fixed;inset:0;z-index:51"></canvas>
+  <div class="glass wcard" style="z-index:52">
+    <div class="wtrophy">🏆</div>
+    <div class="wtitle">GAME ON!</div>
+    <div class="wteam" id="wteam"></div>
+    <div class="wtime" id="wtime"></div>
+    <div class="flag-box">
+      <div class="flag-lbl">🚩 DITT FLAG — LEVER TIL ADMIN</div>
+      <div class="flag-val" id="flag-val"></div>
+    </div>
+    <div class="wstats" id="wstats"></div>
+  </div>
+</div>
+
+<!-- TIMEOUT -->
+<div class="screen" id="s-timeout">
+  <div class="glass tocard">
+    <div class="toicon">⏰</div>
+    <div class="totitle">TIDSFRISTEN ER UTE</div>
+    <div class="tosub">Du løste <strong id="to-n">0</strong> av 10 oppgaver.</div>
+    <div class="toprog" id="to-prog"></div>
+    <button class="btn" onclick="resetAndHome()">Prøv igjen</button>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN -->
+<div class="screen" id="s-admin-login">
+  <div class="glass card">
+    <h2>🔐 ADMIN PANEL</h2>
+    <div id="admsg" class="msg"></div>
+    <input type="password" id="adm-pw" placeholder="Passord...">
+    <button class="btn" id="adm-login-btn">LOGG INN</button>
+    <button class="btn sec" onclick="R('home')">← Tilbake</button>
+  </div>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div class="screen" id="s-admin">
+  <div class="aw">
+    <div class="ahdr">
+      <div><div style="font-size:10px;color:var(--muted);letter-spacing:.1em;font-family:var(--gfont)">GAME ON</div><h2>ADMIN DASHBOARD <span id="adm-ver-hdr" style="font-size:13px;color:var(--muted);font-family:var(--mono);font-weight:400;letter-spacing:0;vertical-align:middle;opacity:.7"></span></h2></div>
+      <div class="ahdr-btns">
+        <div class="adm-rem" id="adm-rem" style="display:none">⏱ <span id="adm-rem-val">—</span></div>
+        <button class="abtn" onclick="adminRefresh()">↺ Oppdater</button>
+        <button class="abtn" onclick="exportCSV()" title="Last ned resultater som CSV">📥 CSV</button>
+        <a class="abtn" href="#spectator" target="_blank" title="Åpner live scoreboard i ny fane">👁 Spectator</a>
+        <button class="abtn primary" onclick="showPodium()" title="Seremoni-skjerm med topp 3">🏆 Podium</button>
+        <button class="abtn danger" id="adm-stop-btn" style="display:none" onclick="adminStopGame()">⏹ Stopp spill</button>
+        <button class="abtn danger" onclick="adminResetAll()">⚠ Reset alt</button>
+        <button class="abtn" onclick="R('home')">← Tilbake</button>
+      </div>
+    </div>
+    <div id="fb-banner" class="fbanner warn" style="display:none"></div>
+
+    <!-- ⚙️ INNSTILLINGER PANEL -->
+    <div class="glass s-panel" id="settings-panel">
+      <div class="s-hdr" onclick="toggleSettings()">
+        <span style="font-family:var(--gfont);font-size:11px;letter-spacing:.08em">⚙️ INNSTILLINGER</span>
+        <span id="settings-icon" style="color:var(--muted);font-size:12px">▼</span>
+      </div>
+      <div id="settings-body" style="display:none;padding:16px 18px">
+        <div class="s-grid">
+
+          <div class="s-section-hdr" style="grid-column:1/-1">🕹️ Spill</div>
+
+          <label class="s-lbl">Spilletid</label>
+          <div class="s-inp-wrap">
+            <input class="s-inp" type="number" id="s-duration" min="1" max="120" value="25">
+            <span class="s-unit">minutter</span>
+          </div>
+
+          <label class="s-lbl">Nedtelling ved start</label>
+          <div class="s-inp-wrap">
+            <input class="s-inp" type="number" id="s-countdown" min="3" max="30" value="5">
+            <span class="s-unit">sekunder</span>
+          </div>
+
+          <label class="s-lbl">Maks antall lag</label>
+          <div class="s-inp-wrap">
+            <input class="s-inp" type="number" id="s-maxteams" min="0" max="200" value="0">
+            <span class="s-unit">lag &nbsp;(0 = ubegrenset)</span>
+          </div>
+
+          <div class="s-section-hdr" style="grid-column:1/-1">💡 Hint-tidspunkter
+            <button class="abtn" onclick="autoScaleHints()" style="font-size:10px;padding:3px 9px;margin-left:8px" title="Skalér automatisk etter spilletiden">⚖️ Auto-skalér</button>
+          </div>
+
+          <label class="s-lbl">Hint 1</label>
+          <div class="s-inp-wrap">
+            <input class="s-inp" type="number" id="s-hint1" min="5" max="3600" step="5" value="30">
+            <span class="s-unit">sek etter spørsmålstart</span>
+          </div>
+
+          <label class="s-lbl">Hint 2</label>
+          <div class="s-inp-wrap">
+            <input class="s-inp" type="number" id="s-hint2" min="5" max="3600" step="5" value="60">
+            <span class="s-unit">sek</span>
+          </div>
+
+          <label class="s-lbl">Hint 3</label>
+          <div class="s-inp-wrap">
+            <input class="s-inp" type="number" id="s-hint3" min="5" max="3600" step="5" value="90">
+            <span class="s-unit">sek</span>
+          </div>
+
+          <label class="s-lbl">Hint 4</label>
+          <div class="s-inp-wrap">
+            <input class="s-inp" type="number" id="s-hint4" min="5" max="3600" step="5" value="120">
+            <span class="s-unit">sek</span>
+          </div>
+
+          <div class="s-section-hdr" style="grid-column:1/-1">🖥️ Admin</div>
+
+          <label class="s-lbl">Auto-oppdatering</label>
+          <div class="s-inp-wrap">
+            <input class="s-inp" type="number" id="s-refresh" min="1" max="60" value="3">
+            <span class="s-unit">sekunder</span>
+          </div>
+
+        </div>
+
+        <div id="settings-msg" class="msg" style="display:none;margin-top:10px"></div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+          <button class="abtn primary" onclick="saveSettings()">💾 Lagre innstillinger</button>
+          <button class="abtn" onclick="resetSettings()">↺ Tilbakestill standard</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px">Endringer trer i kraft fra neste spill. Hint-tidspunkter gjelder per spørsmål.</div>
+      </div>
+    </div>
+
+    <!-- PRE-GAME PANEL -->
+    <div class="glass pregame-panel" id="pg-panel">
+      <div class="pg-status">GAME STATUS: KLAR FOR START</div>
+      <div class="pg-count"><span id="pg-count-num">0</span> lag registrert og klare</div>
+      <div class="pg-teams" id="pg-teams"><span class="team-pill empty">Ingen lag ennå...</span></div>
+      <div class="start-section">
+        <button class="abtn primary" id="start-game-btn" onclick="adminStartGame()" disabled>🚀 START SPILL FOR ALLE LAG</button>
+        <span style="font-size:13px;color:var(--muted)">Venter på at alle lag registrerer seg</span>
+      </div>
+    </div>
+    <!-- IN-GAME TABLE -->
+    <div class="glass" id="ig-panel" style="display:none;overflow:auto">
+      <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px;color:var(--muted)">🔍</span>
+        <input id="adm-filter" oninput="adminRefresh()" placeholder="Filtrer på lagnavn …" style="background:transparent;border:none;outline:none;font-size:13px;color:var(--text);width:220px;font-family:var(--font)">
+      </div>
+      <table class="atbl">
+        <thead><tr><th>STATUS</th><th>LAG</th><th>FREMGANG</th><th>NIVÅ</th><th>POENG</th><th>TID</th><th>HINT</th><th></th></tr></thead>
+        <tbody id="atbody"></tbody>
+      </table>
+      <div class="empty-state" id="aempty" style="display:none">Ingen lag registrert ennå.</div>
+    </div>
+
+    <!-- FASIT-PANEL -->
+    <div class="glass" style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer" onclick="toggleAnswers()">
+        <span style="font-family:var(--gfont);font-size:12px;letter-spacing:.08em;color:var(--text)">🔑 FASIT — ALLE SVAR</span>
+        <span id="ans-icon" style="color:var(--muted);font-size:12px">▼</span>
+      </div>
+      <div id="ans-body" style="display:none;padding:12px 14px">
+        <div style="font-size:12px;color:rgba(255,255,255,.55);margin-bottom:12px">Klikk på et svar for å kopiere · kun synlig for admin</div>
+        <div id="ans-list"></div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center"><span style="opacity:.5">v<span id="adm-ver"></span></span><span>Auto-oppdaterer hvert 3. sek · <span id="last-ref">—</span></span></div>
+    <!-- HISTORIKK PANEL -->
+    <div class="glass" style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer" onclick="toggleHistoryPanel()">
+        <span style="font-family:var(--gfont);font-size:11px;letter-spacing:.08em;color:var(--muted)">📋 TIDLIGERE SPILL</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="abtn danger" onclick="event.stopPropagation();deleteAllCompletedGames()" style="font-size:11px;padding:5px 10px">🗑 Slett alle</button>
+          <span id="cg-icon" style="color:var(--muted);font-size:12px">▼</span>
+        </div>
+      </div>
+      <div id="cg-body" style="display:none;padding:12px 14px">
+        <div id="cg-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SPECTATOR – LIVE SCOREBOARD -->
+<div class="screen" id="s-spectator">
+  <div class="spec-wrap">
+    <div class="spec-hdr">
+      <div>
+        <div style="font-family:var(--gfont);font-size:9px;letter-spacing:.18em;color:var(--muted)">● LIVE</div>
+        <div style="font-family:var(--gfont);font-size:22px;font-weight:900;color:var(--amber)">GAME ON</div>
+      </div>
+      <div style="text-align:center">
+        <div id="spec-time" style="font-size:20px;font-weight:700;color:var(--cyan);font-family:var(--mono)"></div>
+        <div id="spec-count" style="font-size:11px;color:var(--muted);margin-top:2px"></div>
+      </div>
+      <div style="font-family:var(--gfont);font-size:9px;letter-spacing:.1em;color:var(--muted);text-align:right">SCOREBOARD<br><span style="color:rgba(255,255,255,.2)">auto-refresh 3s</span></div>
+    </div>
+    <table class="spec-tbl">
+      <thead><tr>
+        <th style="width:52px">#</th>
+        <th>LAG</th>
+        <th style="width:220px">FREMGANG</th>
+        <th style="width:130px;text-align:right">POENG</th>
+      </tr></thead>
+      <tbody id="spec-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PODIUM – SEREMONI -->
+<div class="screen" id="s-podium">
+  <canvas id="fw-cv2" style="position:fixed;inset:0;z-index:51;pointer-events:none"></canvas>
+  <div class="pdm-wrap">
+    <button class="abtn" onclick="R('admin')" style="position:absolute;top:16px;left:16px">← Admin</button>
+    <button class="abtn" onclick="R('spectator')" style="position:absolute;top:16px;right:16px">👁 Spectator</button>
+    <div style="font-family:var(--gfont);font-size:10px;letter-spacing:.18em;color:var(--muted);margin-bottom:4px">CTF CHALLENGE</div>
+    <div class="pdm-title">RESULTATER</div>
+    <div id="podium-places" class="pdm-stage"></div>
+    <div style="position:absolute;bottom:20px;font-family:var(--gfont);font-size:10px;color:rgba(255,255,255,.15);letter-spacing:.1em">GAME ON</div>
+  </div>
+</div>
+
+<!-- SPILLEREGLER -->
+<div class="screen" id="s-rules">
+  <div class="rules-wrap">
+    <button class="abtn rules-back" onclick="R('home')">← Tilbake</button>
+
+    <div class="rules-logo"><span class="lc">GAME</span> <span class="la">ON</span></div>
+    <div class="rules-sub">CTF Challenge — Spilleregler</div>
+
+    <!-- Oversikt -->
+    <div class="glass rules-card">
+      <h3>🎮 Hva er dette?</h3>
+      <p>Game On er en IT-kunnskapskonkurranse i CTF-stil (Capture The Flag). Hvert lag løser 10 oppgaver innen temaer som nettverk, Linux, kryptografi og web-sikkerhet.</p>
+      <div class="rules-quick">
+        <div class="rq-item"><span class="rq-icon">⏱</span><span class="rq-val">25 min</span><span class="rq-lbl">Spilletid</span></div>
+        <div class="rq-item"><span class="rq-icon">🧩</span><span class="rq-val">10</span><span class="rq-lbl">Oppgaver</span></div>
+        <div class="rq-item"><span class="rq-icon">📋</span><span class="rq-val">4</span><span class="rq-lbl">Hint per oppg.</span></div>
+        <div class="rq-item"><span class="rq-icon">🏆</span><span class="rq-val">6 300</span><span class="rq-lbl">Maks poeng</span></div>
+      </div>
+    </div>
+
+    <!-- Vanskelighetsgrader -->
+    <div class="glass rules-card">
+      <h3>🎯 Velg vanskelighetsgrad</h3>
+      <p>For hver oppgave velger laget selv vanskelighetsgrad. Høyere vanskelighetsgrad gir flere poeng — men også større risiko.</p>
+      <div class="rules-levels">
+        <div class="rl-row easy">
+          <div class="rl-badge">🟢 LETT</div>
+          <div class="rl-info">
+            <div class="rl-pts">100 pts</div>
+            <div class="rl-desc">Grunnleggende konsept, rett frem</div>
+          </div>
+          <div class="rl-hint-cost">−15 pts/hint</div>
+        </div>
+        <div class="rl-row med">
+          <div class="rl-badge">🟡 MIDDELS</div>
+          <div class="rl-info">
+            <div class="rl-pts">300 pts</div>
+            <div class="rl-desc">Krever litt mer kunnskap og tanke</div>
+          </div>
+          <div class="rl-hint-cost">−40 pts/hint</div>
+        </div>
+        <div class="rl-row hard">
+          <div class="rl-badge">🔴 VANSKELIG</div>
+          <div class="rl-info">
+            <div class="rl-pts">600 pts</div>
+            <div class="rl-desc">Ekspertoppgave — stor belønning</div>
+          </div>
+          <div class="rl-hint-cost">−80 pts/hint</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Poengberegning -->
+    <div class="glass rules-card">
+      <h3>📊 Slik beregnes poengene</h3>
+      <div class="rules-score-grid">
+        <div class="rsg-hdr">Nivå</div><div class="rsg-hdr">Grunnpoeng</div><div class="rsg-hdr">Hint-trekk</div><div class="rsg-hdr">Min. score</div>
+        <div class="rsg-cell easy-txt">🟢 Lett</div><div class="rsg-cell">100</div><div class="rsg-cell">−15 per hint</div><div class="rsg-cell">40</div>
+        <div class="rsg-cell med-txt">🟡 Middels</div><div class="rsg-cell">300</div><div class="rsg-cell">−40 per hint</div><div class="rsg-cell">140</div>
+        <div class="rsg-cell hard-txt">🔴 Vanskelig</div><div class="rsg-cell">600</div><div class="rsg-cell">−80 per hint</div><div class="rsg-cell">280</div>
+      </div>
+      <div class="rules-bonus">
+        <div class="rb-icon">⚡</div>
+        <div>
+          <strong>Tidsbonus</strong> — Fullfør raskt for ekstrapoeng!<br>
+          <span style="color:var(--muted);font-size:13px">Bonus = gjenstående sekunder ÷ 5 &nbsp;·&nbsp; maks ~300 pts</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hint-systemet -->
+    <div class="glass rules-card">
+      <h3>💡 Hint-systemet</h3>
+      <p>Hvert spørsmål har 4 progressive hint som låses opp automatisk over tid. Jo lenger du venter, jo mer avslørende — men det koster poeng.</p>
+      <div class="rules-hints">
+        <div class="rh-row"><span class="rh-time">30 sek</span><span class="rh-badge h1">Hint 1</span><span class="rh-desc">Generelt konseptuelt tips</span></div>
+        <div class="rh-row"><span class="rh-time">60 sek</span><span class="rh-badge h2">Hint 2</span><span class="rh-desc">Mer spesifikk retning</span></div>
+        <div class="rh-row"><span class="rh-time">90 sek</span><span class="rh-badge h3">Hint 3</span><span class="rh-desc">Konkret veiledning</span></div>
+        <div class="rh-row"><span class="rh-time">120 sek</span><span class="rh-badge h4">Hint 4</span><span class="rh-desc">Nesten løsningen 🔑</span></div>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-top:12px">⚠ Hvert hint du <em>åpner</em> trekkes fra poengsummen for det spørsmålet.</p>
+    </div>
+
+    <!-- Flagget -->
+    <div class="glass rules-card">
+      <h3>🚩 Lever flagget</h3>
+      <p>Når alle 10 oppgaver er løst, får laget et unikt <strong>FLAG{...}</strong> som skal leveres til arrangøren. Flagget beviser at laget faktisk fullførte.</p>
+    </div>
+
+    <button class="btn rules-cta" onclick="R('home')">Tilbake til spillet →</button>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
