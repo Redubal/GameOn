@@ -322,6 +322,7 @@ let ST={
   totalScore:0,
   finished:false,finishTime:0,timedOut:false,
 };
+function blankST(){return {teamName:'',registered:false,registeredAt:0,playing:false,gameStartTime:0,questionStartTime:0,currentQ:0,hintsPerQ:Array(10).fill(0),totalHints:0,done:Array(10).fill(false),wrongAttempts:Array(10).fill(0),choices:Array(10).fill(null),scores:Array(10).fill(0),totalScore:0,finished:false,finishTime:0,timedOut:false};}
 function calcScore(topicIdx){
   const lvl=ST.choices[topicIdx];if(!lvl)return 0;
   const lvlIdx=['lett','middels','vanskelig'].indexOf(lvl);
@@ -418,7 +419,7 @@ function gameTick(){
     if(rem<=0){stopTimer();stopGameWatcher();handleTimeout();}
   }catch(e){console.error('gameTick:',e);}
 }
-function setQStart(){_qst=Date.now();}
+function setQStart(){_qst=Date.now();ST.questionStartTime=_qst;saveTeam();}
 
 
 // ============================================================
@@ -659,14 +660,6 @@ function renderProgress(){
     const col=ST.choices[i]?colors[ST.choices[i]]:'';
     return`<div class="${cl}" style="${col?'background:'+col+';box-shadow:0 0 6px '+col:''}" title="Q${i+1}${ST.choices[i]?' ('+ST.choices[i]+')':''}"></div>`;
   }).join('');
-  // Gjenåpne detalj-rader som var åpne før refresh
-  openRows.forEach(id=>{
-    const r=document.getElementById('adm-det-'+id);
-    if(r){r.style.display='table-row';
-      const btn=r.previousElementSibling?.querySelector('.abtn');
-      if(btn&&btn.textContent.includes('Detaljer'))btn.textContent='▼ Lukk';
-    }
-  });
 }
 let _lastSubmit=0;
 function submitAnswer(){
@@ -736,7 +729,7 @@ function leaveGame(){
     LS.del('last_team');
   }
   const prevName=ST.teamName||'';
-  ST={teamName:"",registered:false,registeredAt:0,playing:false,gameStartTime:0,questionStartTime:0,currentQ:0,hintsPerQ:Array(10).fill(0),totalHints:0,done:Array(10).fill(false),wrongAttempts:Array(10).fill(0),choices:Array(10).fill(null),scores:Array(10).fill(0),totalScore:0,finished:false,finishTime:0,timedOut:false};
+  ST=blankST();
   document.getElementById('tname').value=prevName;R('home');
 }
 function resetAndHome(){
@@ -745,7 +738,7 @@ function resetAndHome(){
   document.getElementById('stopped-ov').classList.remove('show');
   document.getElementById('team-podium-ov').classList.remove('show');
   LS.del('podiumResult');
-  ST={teamName:"",registered:false,registeredAt:0,playing:false,gameStartTime:0,questionStartTime:0,currentQ:0,hintsPerQ:Array(10).fill(0),totalHints:0,done:Array(10).fill(false),wrongAttempts:Array(10).fill(0),choices:Array(10).fill(null),scores:Array(10).fill(0),totalScore:0,finished:false,finishTime:0,timedOut:false};
+  ST=blankST();
   document.getElementById('tname').value='';R('home');
 }
 
@@ -885,22 +878,30 @@ function R(screen){
 // ============================================================
 //  REGISTRERING
 // ============================================================
-function registerTeam(){
+async function registerTeam(){
   const nm=document.getElementById('tname').value.trim();
   if(!nm){showMsg('hmsg','Skriv inn lagnavn!','err');return;}
   if(nm.length<2){showMsg('hmsg','Lagnavn må ha minst 2 tegn','err');return;}
+  // Sjekk duplikat lagnavn
+  if(getTeams().includes(nm)){showMsg('hmsg','Lagnavn er allerede tatt!','err');return;}
+  if(db){const exists=await fbGet('teams/'+nm);if(exists){showMsg('hmsg','Lagnavn er allerede tatt!','err');return;}}
+  // Sjekk maxTeams mot både localStorage og Firebase
   if(CFG.maxTeams>0){
-    const cur=getTeams().length;
+    let cur=getTeams().length;
+    if(db){const fbTeams=await fbGet('teams');if(fbTeams)cur=Math.max(cur,Object.keys(fbTeams).length);}
     if(cur>=CFG.maxTeams){showMsg('hmsg','🔒 Maks '+CFG.maxTeams+' lag nådd. Kontakt admin.','err');return;}
   }
-  ST={teamName:nm,registered:true,registeredAt:Date.now(),playing:false,gameStartTime:0,questionStartTime:0,currentQ:0,hintsPerQ:Array(10).fill(0),totalHints:0,done:Array(10).fill(false),wrongAttempts:Array(10).fill(0),choices:Array(10).fill(null),scores:Array(10).fill(0),totalScore:0,finished:false,finishTime:0,timedOut:false};
+  ST={...blankST(),teamName:nm,registered:true,registeredAt:Date.now()};
   addTeam(nm);saveTeam();LS.set('last_team',nm);
   if(db)fbSaveTeam();
   const d=getStartData();
   if(d&&d.gameId===CFG.gameId&&d.startTime){
     if(Date.now()>d.startTime){
       showMsg('hmsg','🔒 Spillet er allerede i gang. Kontakt admin.','err');
-      ST={teamName:'',registered:false,registeredAt:0,playing:false,gameStartTime:0,questionStartTime:0,currentQ:0,hintsPerQ:Array(10).fill(0),totalHints:0,done:Array(10).fill(false),wrongAttempts:Array(10).fill(0),choices:Array(10).fill(null),scores:Array(10).fill(0),totalScore:0,finished:false,finishTime:0,timedOut:false};
+      // Rydd opp ghost-registrering
+      LS.del('team_'+nm);LS.set('teams',getTeams().filter(n=>n!==nm));
+      if(db)fbRemoveTeam(nm);
+      ST=blankST();
       return;
     }
     beginGame(d.startTime);
@@ -1052,7 +1053,7 @@ function adminStartGame(){
   if(!confirm('Start spillet for alle registrerte lag?\nLag får '+CFG.countdownSecs+' sekunder nedtelling.'))return;
   const startTime=Date.now()+(CFG.countdownSecs*1000);
   const data={gameId:CFG.gameId,startTime};
-  LS.set('start',data);if(db)fbSet('config',data);adminRefresh();
+  LS.set('start',data);if(db){try{db.ref(fbPath('config')).update(data);}catch(e){}}adminRefresh();
 }
 async function adminStopGame(){
   if(!confirm('Stopp spillet? Resultater lagres automatisk.'))return;
@@ -1491,7 +1492,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         const elapsed=Math.floor((Date.now()-s.gameStartTime)/1000);
         if(elapsed<CFG.duration){
           // Auto-resume uten å spørre – spilleren befinner seg på gjeldende spørsmål
-          ST={...s};_gst=ST.gameStartTime;_qst=Date.now();
+          ST={...s};_gst=ST.gameStartTime;_qst=ST.questionStartTime||Date.now();
           R('game');startTimer(ST.gameStartTime);startGameWatcher(ST.gameStartTime);return;
         }
       }
