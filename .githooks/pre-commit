@@ -1,0 +1,4 @@
+#!/bin/sh
+BUILD=$(date +%Y%m%d)
+sed -i "s/build:.*\"[0-9]\{8\}\"/build:          \"$BUILD\"/" app.js
+git add app.js

@@ -15,7 +15,7 @@ const FIREBASE_CONFIG = {
 //  KONFIGURASJON
 // ============================================================
 const CFG = {
-  version:        "2.3",
+  version:        "2.4",
   build:          "20260622",
   duration:       25 * 60,
   hintDelays:     [30, 60, 90, 120],
