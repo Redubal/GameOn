@@ -367,9 +367,7 @@ input::placeholder{color:var(--muted)}
 
 /* ── FASIT-PANEL ─────────────────────────────────────────── */
 #ans-body {
-  max-height: calc(100vh - 180px);
-  overflow-y: auto;
-  scroll-behavior: smooth;
+  overflow-y: visible;
 }
 .ans-topic { margin-bottom: 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; overflow: hidden; }
 .ans-topic-hdr { padding: 9px 14px; background: rgba(255,255,255,.05); font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,.9); }
